@@ -1,0 +1,22 @@
+import moviepy.editor as mp
+import re
+
+# Load the video file
+video = mp.VideoFileClip('.mov')
+
+# Define the start time and end time of each subtitle
+subtitles = []
+for i, sub in enumerate(video.subtitles()):
+    start_time = sub.start
+    end_time = sub.end
+    text = sub.text.strip()
+    # Use regular expression to remove unwanted characters from the text
+    text = re.sub(r'[^\w\s]', '', text)
+    subtitles.append((i+1, start_time, end_time, text))
+
+# Generate the SRT file
+with open('subtitles.srt', 'w') as f:
+    for sub in subtitles:
+        f.write('{}\n'.format(sub[0]))
+        f.write('{} --> {}\n'.format(sub[1], sub[2]))
+        f.write('{}\n\n'.format(sub[3]))
