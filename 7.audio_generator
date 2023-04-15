@@ -1,0 +1,31 @@
+import ffmpeg
+from gtts import gTTS
+import PyPDF2
+import tempfile
+import os
+
+# Path to PDF file
+pdf_path = 'text.pdf'
+
+# Read PDF file and extract text
+pdf_file = open(pdf_path, 'rb')
+pdf_reader = PyPDF2.PdfFileReader(pdf_file)
+text = ''
+for page_num in range(pdf_reader.numPages):
+    page = pdf_reader.getPage(page_num)
+    text += page.extractText()
+
+# Convert text to speech using Google Text-to-Speech
+tts = gTTS(text)
+
+# Save speech to temporary file
+temp_file = tempfile.NamedTemporaryFile(suffix='.mp3', delete=False)
+temp_file.close()
+tts.save(temp_file.name)
+
+# Convert speech to WAV using ffmpeg
+output_path = 'output.wav'
+ffmpeg.input(temp_file.name).output(output_path).run()
+
+# Delete temporary file
+os.remove(temp_file.name)
