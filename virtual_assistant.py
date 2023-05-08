@@ -1,12 +1,16 @@
 # libraries
+from forex_python.converter import CurrencyRates, RatesNotAvailableError
 from dotenv import load_dotenv
 import speech_recognition as sr
+from bs4 import BeautifulSoup
+from fpdf import FPDF
 import pyttsx3
 import datetime
 import webbrowser
 import requests
 import subprocess
 import pyperclip
+import random
 import shutil
 import os
 
@@ -93,12 +97,101 @@ def get_directions():
     webbrowser.get(
         using='open -a /Applications/Brave\ Browser.app %s').open(url)
     speak(f"Here are the {mode} directions from {start} to {destination}")
+    
+    
+# hiking randomizer
+def hiking_randomizer():
+    locations = []
+
+    selected_location = random.choice(locations)
+    speak(f"Go to: {selected_location}")
+    
+    
+# cinema times
+def get_cinema_times():
+    # insert url
+    url = ''
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    movies = soup.find_all('ul', {'class': 'Sessions'})
+    cinema_times = []
+    for movie in movies:
+        title = movie.find('li', {'data-name': True}).get('data-name').strip()
+        times = [time.text for time in movie.find_all(
+            'span', {'class': 'Time'})]
+        cinema_times.append({'title': title, 'times': times})
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 10, f"Tomorrow's Cinema Times:", 0, 1)
+    pdf.set_font('Arial', '', 12)
+    for movie in cinema_times:
+        pdf.cell(0, 10, movie['title'], 0, 1)
+        for time in movie['times']:
+            pdf.cell(10)
+            pdf.cell(0, 10, time, 0, 1)
+        pdf.cell(0, 10, '', 0, 1)
+
+    pdf.output('cinema_times.pdf')
+    speak(f"Printing tomorrow's cinema times")
+    
+    
+# convert currencies
+def get_currency():
+    currency_rates = CurrencyRates()
+
+    while True:
+        try:
+            r = sr.Recognizer()
+            with sr.Microphone() as source:
+                speak("Say the currency code to convert from:")
+                audio = r.listen(source)
+            from_currency = r.recognize_google(audio)
+
+            with sr.Microphone() as source:
+                speak("Say the currency code to convert to:")
+                audio = r.listen(source)
+            to_currency = r.recognize_google(audio)
+
+            with sr.Microphone() as source:
+                speak("Say the amount to be converted:")
+                audio = r.listen(source)
+            amount = float(r.recognize_google(audio))
+
+            result = currency_rates.convert(from_currency, to_currency, amount)
+            speak("{0} {1} is equal to {2} {3}".format(
+                amount, from_currency, result, to_currency))
+            break
+
+        except sr.UnknownValueError:
+            speak("Sorry, I did not understand that. Please try again.")
+        except sr.RequestError:
+            speak(
+                "Sorry, I'm having trouble accessing the speech recognition service. Please try again later.")
+            break
+        except RatesNotAvailableError:
+            speak(
+                "Sorry, the currency rates are not available at the moment. Please try again later.")
+            break
 
 
 # open any app on computer
 def open_app(app_name):
     subprocess.call(["open", "-a", app_name])
     speak("Opening " + app_name)
+    
+    
+# open vs code
+def open_vs_code():
+    subprocess.call(["open", "-a", "Visual Studio Code"])
+    speak("Opening VS Code")
+
+
+# open terminal
+def open_terminal():
+    subprocess.call(["open", "-a", "Terminal"])
+    speak("Opening Terminal")
 
 
 # open mail
@@ -134,6 +227,63 @@ def file_manager(source_dir, dest_dir, filenames):
         dst_path = os.path.join(dest_dir, filename)
         shutil.move(src_path, dst_path)
         speak("Organising files")
+        
+        
+# decision maker
+def decision_maker():
+    speak("How many options are you choosing from?")
+    r = sr.Recognizer()
+    try:
+        with sr.Microphone() as source:
+            audio = r.listen(source)
+        num_options = int(r.recognize_google(audio))
+        options = []
+        for i in range(num_options):
+            speak(f"What's option number {i+1}?")
+            with sr.Microphone() as source:
+                audio = r.listen(source)
+            try:
+                option = r.recognize_google(audio)
+                speak(f"You said {option}.")
+                options.append(option)
+            except:
+                speak("I'm sorry, I didn't catch that.")
+                options.append("")
+                continue
+            if i != num_options - 1:
+                with sr.Microphone() as source:
+                    audio = r.listen(source)
+                try:
+                    if r.recognize_google(audio).lower() == "stop":
+                        break
+                except:
+                    pass
+        if options:
+            random_option = random.choice(options)
+            speak("I suggest you choose " + random_option)
+    except:
+        speak("I'm sorry, I didn't catch that.")
+
+
+# password generator
+def generate_spoken_password(length):
+    digits = ["zero", "one", "two", "three", "four",
+              "five", "six", "seven", "eight", "nine"]
+    password = ""
+    for i in range(length):
+        password += random.choice(digits[1:]) + " "
+    return password.strip()
+
+
+def password_generator():
+    length = 4
+    spoken_password = generate_spoken_password(length)
+    speak(f"Your generated password is {spoken_password}")
+    
+    
+# respond to saying thank you
+def respond_to_thank_you():
+    speak("You're welcome!")
 
 
 # main function
@@ -155,6 +305,15 @@ def main():
 
         elif "directions" in text or "map" in text or "maps" in text:
             get_directions()
+            
+        elif "hike" in text or "hiking" in text or "hiking randomizer" in text or "walk" in text or "walking" in text or "walking randomizer" in text:
+            hiking_randomizer()
+
+        elif "cinema times" in text:
+            get_cinema_times()
+
+        elif "currency" in text:
+            get_currency()
 
         elif "app" in text:
             if "open " in text:
@@ -165,6 +324,12 @@ def main():
 
         elif "mail" in text or "email" in text:
             open_mail()
+            
+        elif "vs code" in text or "code" in text:
+            open_vs_code()
+
+        elif "terminal" in text:
+            open_terminal()
 
         elif "website" in text:
             open_website()
@@ -175,6 +340,15 @@ def main():
         elif "file manager" in text or "move file" in text or "move files" in text:
             file_manager("/to/file_path/1",
                          "/to/file_path/2", "pdf")
+            
+        elif "decide for me" in text:
+            decision_maker()
+
+        elif "password" in text:
+            password_generator()
+
+        elif "thank you" in text or "thanks" in text or "cheers" in text:
+            respond_to_thank_you()
 
         elif "exit" in text or "axit" in text or "go to sleep" in text or "sleep" in text:
             speak("Goodbye!")
